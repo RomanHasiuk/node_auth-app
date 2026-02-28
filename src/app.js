@@ -5,6 +5,7 @@ import { authRouter } from './routes/auth.router.js';
 import { userRouter } from './routes/user.router.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 import cookieParser from 'cookie-parser';
+import { ApiError } from './exceptions/api.error.js';
 
 export const createApp = () => {
   const app = express();
@@ -21,6 +22,11 @@ export const createApp = () => {
 
   app.use('/auth', authRouter);
   app.use('/users', userRouter);
+
+  app.use((req, res, next) => {
+    next(ApiError.NotFound());
+  });
+
   app.use(errorMiddleware);
 
   app.get('/', (_req, res) => {

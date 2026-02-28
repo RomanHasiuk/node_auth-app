@@ -8,3 +8,5 @@ authRouter.get('/activation/:activationToken', authController.activate);
 authRouter.post('/login/', authController.login);
 authRouter.get('/refresh', authController.refresh);
 authRouter.post('/logout', authController.logout);
+authRouter.post('/forgot-password', authController.forgotPassword);
+authRouter.post('/reset-password', authController.resetPassword);

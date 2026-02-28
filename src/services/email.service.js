@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export function send({ email, subject, html }) {
+function send({ email, subject, html }) {
   return transporter.sendMail({
     from: 'Auth API',
     to: email,
@@ -20,7 +20,7 @@ export function send({ email, subject, html }) {
   });
 }
 
-export function sendActivationLink(email, token) {
+function sendActivationLink(email, token) {
   const link = `${process.env.CLIENT_URL}/activate/${token}`;
 
   return send({
@@ -33,4 +33,34 @@ export function sendActivationLink(email, token) {
   });
 }
 
-export const emailService = { send, sendActivationLink };
+function sendResetPasswordLink(email, token) {
+  const link = `${process.env.CLIENT_URL}/reset-password/${token}`;
+
+  return send({
+    email,
+    subject: 'Password reset',
+    html: `
+      <h1>Password reset</h1>
+      <p>Click the link below to reset your password. It is valid for 15 minutes.</p>
+      <a href="${link}">${link}</a>
+    `,
+  });
+}
+
+function sendEmailChangeNotice(email) {
+  return send({
+    email,
+    subject: 'Security Alert: Email Changed',
+    html: `
+    <h1> Email Change Notification</h1>
+    <p>Your account email has been successfully changed. If you did not authorize this action, please contact support immediately.</p>
+    `,
+  });
+}
+
+export const emailService = {
+  send,
+  sendActivationLink,
+  sendResetPasswordLink,
+  sendEmailChangeNotice,
+};

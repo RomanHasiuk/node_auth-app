@@ -7,54 +7,21 @@ import { jwtService } from '../services/jwt.service.js';
 import { tokenService } from '../services/token.service.js';
 import { ApiError } from '../exceptions/api.error.js';
 
-function validateEmail(value) {
-  if (!value) {
-    return 'Email is required';
-  }
-
-  const emailPattern = /^[\w.+-]+@([\w-]+\.){1,3}[\w-]{2,}$/;
-
-  if (!emailPattern.test(value)) {
-    return 'Email is not valid';
-  }
-}
-
-function validatePassword(value) {
-  if (!value) {
-    return 'Password is required';
-  }
-
-  if (value.length < 6) {
-    return 'Password must be at least 6 characters long';
-  }
-
-  if (!/[A-Z]/.test(value)) {
-    return 'Password must contain at least one uppercase letter';
-  }
-
-  if (!/\d/.test(value)) {
-    return 'Password must contain at least one number';
-  }
-
-  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) {
-    return 'Password must contain at least one special character (e.g., !@#$%^&*)';
-  }
-}
-
 async function register(req, res) {
-  const { email, password } = req.body;
+  const { name, email, password } = req.body;
 
   const validationErrors = {
-    email: validateEmail(email),
-    password: validatePassword(password),
+    name: userService.validateName(name),
+    email: userService.validateEmail(email),
+    password: userService.validatePassword(password),
   };
 
-  if (validationErrors.email || validationErrors.password) {
+  if (
+    validationErrors.name ||
+    validationErrors.email ||
+    validationErrors.password
+  ) {
     throw ApiError.BadRequest('Validation error', validationErrors);
-  }
-
-  if (!email || !password) {
-    throw ApiError.BadRequest('Email and password are required');
   }
 
   const existingUser = await userService.getByEmail(email);
@@ -63,7 +30,7 @@ async function register(req, res) {
     throw ApiError.BadRequest('User already exists');
   }
 
-  const user = await userService.create(email, password);
+  const user = await userService.create(name, email, password);
 
   await emailService.sendActivationLink(user.email, user.activationToken);
 
@@ -96,6 +63,12 @@ async function login(req, res) {
 
   if (!user) {
     throw ApiError.BadRequest('User with this email does not exist');
+  }
+
+  if (user.activationToken) {
+    throw ApiError.BadRequest(
+      'Account is not activated. Please check your email.',
+    );
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -179,10 +152,59 @@ async function logout(req, res) {
   });
 }
 
+async function forgotPassword(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    throw ApiError.BadRequest('Email is required');
+  }
+
+  const user = await userService.getByEmail(email);
+
+  if (!user) {
+    throw ApiError.BadRequest('User with this email does not exsist');
+  }
+
+  const normalizedUser = userService.normalize(user);
+  const resetToken = jwtService.generateResetToken(normalizedUser);
+
+  await emailService.sendResetPasswordLink(user.email, resetToken);
+
+  res.status(200).json({ message: 'Password reset link sent to your email' });
+}
+
+async function resetPassword(req, res) {
+  const { resetToken, newPassword } = req.body;
+
+  if (!resetToken || !newPassword) {
+    throw ApiError.BadRequest('Token and new password are required');
+  }
+
+  const passwordError = userService.validatePassword(newPassword);
+
+  if (passwordError) {
+    throw ApiError.BadRequest(passwordError);
+  }
+
+  const userData = jwtService.validateResetToken(resetToken);
+
+  if (!userData) {
+    throw ApiError.BadRequest('Invalid or expired reset token');
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  await userService.updatePassword(userData.id, hashedPassword);
+
+  res.status(200).json({ message: 'Password successfully reset' });
+}
+
 export const authController = {
   register,
   activate,
   login,
   refresh,
   logout,
+  forgotPassword,
+  resetPassword,
 };
