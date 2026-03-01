@@ -139,17 +139,12 @@ async function refresh(req, res) {
 async function logout(req, res) {
   const { refreshToken } = req.cookies;
 
-  if (!refreshToken) {
-    return res.status(204).send();
+  if (refreshToken) {
+    await tokenService.removeByToken(refreshToken);
+    res.clearCookie('refreshToken');
   }
 
-  await tokenService.getByToken(refreshToken);
-
-  res.clearCookie('refreshToken');
-
-  res.status(200).json({
-    message: 'Successfully fogged out',
-  });
+  return res.status(204).send();
 }
 
 async function forgotPassword(req, res) {
@@ -162,7 +157,7 @@ async function forgotPassword(req, res) {
   const user = await userService.getByEmail(email);
 
   if (!user) {
-    throw ApiError.BadRequest('User with this email does not exsist');
+    throw ApiError.BadRequest('User with this email does not exist');
   }
 
   const normalizedUser = userService.normalize(user);
@@ -174,10 +169,14 @@ async function forgotPassword(req, res) {
 }
 
 async function resetPassword(req, res) {
-  const { resetToken, newPassword } = req.body;
+  const { resetToken, newPassword, confirmation } = req.body;
 
-  if (!resetToken || !newPassword) {
-    throw ApiError.BadRequest('Token and new password are required');
+  if (!newPassword || !confirmation) {
+    throw ApiError.BadRequest('New password and confirmation are required');
+  }
+
+  if (newPassword !== confirmation) {
+    throw ApiError.BadRequest('New password and confirmation do not match');
   }
 
   const passwordError = userService.validatePassword(newPassword);
